@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Bloom</title><meta name="theme-color" content="#08070d">
+<title>Just for You</title><meta name="theme-color" content="#08070d">
 <style>
 *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#08070d}body{background:radial-gradient(ellipse at 50% 40%,#241021 0%,#100b17 48%,#08070d 82%)}canvas{display:block;position:fixed;inset:0;width:100%;height:100%;height:100dvh;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent} 
 </style>
@@ -12,7 +12,7 @@
 <canvas id="bloom" aria-label="Buket bunga ASCII yang mekar ke berbagai arah"></canvas>
 <script>
 'use strict';
-const canvas=document.getElementById('bloom'),ctx=canvas.getContext('2d');
+const canvas=document.getElementById('bloom'),ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
 const source=document.createElement('canvas'); let s=source.getContext('2d',{willReadFrequently:true});
 const TAU=Math.PI*2, clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), mix=(a,b,t)=>a+(b-a)*t;
 const ease=x=>{x=clamp(x);return x*x*(3-2*x)};
@@ -43,42 +43,45 @@ const blooms=[
  [140,380,69,coral,'rose',1.12,-.64,.37], [622,379,71,lilac,'rose',1.22,.64,.32],
  [260,347,86,pink,'rose',1.33,-.42,.38], [497,350,85,peach,'rose',1.44,.44,.24],
  [380,282,100,rose,'rose',1.54,.06,.49], [380,440,78,cream,'daisy',1.82,-.18,.40],
- [242,447,55,gold,'daisy',1.9,-.52,.12], [520,449,55,coral,'daisy',2.04,.48,.29]
+ [242,447,55,gold,'daisy',1.9,-.52,.12], [520,449,55,coral,'daisy',2.04,.48,.29],
+ [112,523,61,peach,'rose',0,-.55,.46], [650,530,64,coral,'rose',0,.56,.53],
+ [205,576,76,lilac,'daisy',0,-.36,.65], [556,581,77,pink,'daisy',0,.38,.58],
+ [380,615,93,pink,'rose',0,.10,.68]
 ];
-const flowers=blooms.map(([x,y,r,p,kind,delay,nx,nz],i)=>({x,y,r:r*(.95+Math.random()*.10),p:{dark:p.dark,mid:lerpColor(p.mid,p.light,Math.random()*.09),light:p.light},kind,delay,nx:clamp(nx+(Math.random()-.5)*.10,-.85,.85),nz:clamp(nz+(Math.random()-.5)*.13,-.23,.62),seed:i+1,touch:-100,depth:.55+r/115}));
+const flowers=blooms.map(([x,y,r,p,kind,delay,nx,nz],i)=>({x,y,r:r*1.22*(.96+Math.random()*.08),p:{dark:p.dark,mid:lerpColor(p.mid,p.light,Math.random()*.09),light:p.light},kind,delay,nx:clamp(nx*.77+(Math.random()-.5)*.09,-.67,.67),nz:clamp(.37+nz*.76+(Math.random()-.5)*.10,.25,.87),seed:i+1,touch:-100,depth:.55+r/115}));
+const flowerLayers=flowers.slice().sort((a,b)=>a.y-b.y);
 const sprigs=Array.from({length:24},(_,i)=>({x:[61,699,95,665,172,588,288,472,325,435,94,666,183,577,300,460,42,718,114,646,223,537,254,506][i],y:[220,224,134,138,84,84,52,55,122,111,422,424,484,484,500,500,365,362,465,465,59,61,522,520][i],seed:i+1}));
 // Shuffle spatial positions, not rows: every replay gets a fresh bloom score.
 function randomize(){
  const order=flowers.slice();
  for(let i=order.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
  let k=0,wave=0;
- while(k<order.length){const size=Math.random()<.58?3:2;const start=.62+wave*.215+Math.random()*.13;
-  for(let j=0;j<size&&k<order.length;j++,k++){const f=order[k];f.delay=start+Math.random()*.14;f.duration=1.55+Math.random()*.40;f.stemDelay=Math.random()*.26;f.cache=null;}
+ while(k<order.length){const size=Math.random()<.58?3:2;const start=.62+wave*.17+Math.random()*.13;
+  for(let j=0;j<size&&k<order.length;j++,k++){const f=order[k];f.delay=start+Math.random()*.14;f.duration=1.38+Math.random()*.35;f.stemDelay=Math.random()*.26;f.cache=null;}
   wave++;
  }
 }
 randomize();
-function sprig(f,t,g){if(g<=0)return;const x=f.x+Math.sin(t*.82-f.x*.008)*5+camera.x*.62,y=layoutY(f.y)+camera.y*.62;let bx=380+(f.x-380)*(portrait?.34:.23),by=baseY+12;const q=u=>({x:mix(bx,x,u)+Math.sin(u*Math.PI)*(x-380)*.12,y:mix(by,y,u)});s.strokeStyle='#38674e';s.lineWidth=2;s.beginPath();s.moveTo(bx,by);for(let i=1;i<=26;i++){let p=q(i/26*g);s.lineTo(p.x,p.y)}s.stroke();for(let j=0;j<7;j++){let u=.67+j*.048;if(g<u)continue;let p=q(u),side=j%2?1:-1;let v=ease((g-u)/.13),xx=p.x+side*(13+9*Math.sin(j+f.seed))*v,yy=p.y-12*v;s.strokeStyle='#558064';s.lineWidth=1.5;s.beginPath();s.moveTo(p.x,p.y);s.lineTo(xx,yy);s.stroke();for(let k=0;k<3;k++){s.fillStyle=k===0?'#fff1ca':k===1?'#e8a8c4':'#b68ad4';s.beginPath();s.arc(xx+(k-1)*4*v,yy-Math.sin(k*2)*4*v,3.2*v,0,TAU);s.fill();}}}
-let W,H,D,cols,rows,cw,ch,fit,left,offsetY,baseY,yStretch=1,portrait=false,started=performance.now(),last=0;
+function sprig(f,t,g){if(g<=0)return;const x=f.x+Math.sin(t*.82-f.x*.008)*5+camera.x*.62,y=layoutY(f.y)+camera.y*.62;let bx=380+(f.x-380)*(portrait?.67:.44),by=baseY+12;const q=u=>({x:mix(bx,x,u)+Math.sin(u*Math.PI)*(x-380)*.12,y:mix(by,y,u)});s.strokeStyle='#38674e';s.lineWidth=smallScreen?1.6:2;s.beginPath();s.moveTo(bx,by);for(let i=1;i<=26;i++){let p=q(i/26*g);s.lineTo(p.x,p.y)}s.stroke();for(let j=0;j<(portrait?5:7);j++){let u=.67+j*.048;if(g<u)continue;let p=q(u),side=j%2?1:-1;let v=ease((g-u)/.13),xx=p.x+side*(13+9*Math.sin(j+f.seed))*v,yy=p.y-12*v;s.strokeStyle='#558064';s.lineWidth=smallScreen?1.1:1.5;s.beginPath();s.moveTo(p.x,p.y);s.lineTo(xx,yy);s.stroke();for(let k=0;k<3;k++){s.fillStyle=k===0?'#fff1ca':k===1?'#e8a8c4':'#b68ad4';s.beginPath();s.arc(xx+(k-1)*4*v,yy-Math.sin(k*2)*4*v,3.2*v,0,TAU);s.fill();}}}
+let W,H,D,cols,rows,cw,ch,fit,left,offsetY,baseY,yStretch=1,portrait=false,smallScreen=false,started=performance.now(),last=0;
 const layoutY=y=>y*yStretch;
 const camera={x:0,y:0,tx:0,ty:0};let lastTime=0,worldTime=0;
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function resize(){
- W=canvas.clientWidth||innerWidth;H=canvas.clientHeight||innerHeight;D=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(W*D);canvas.height=Math.round(H*D);
- ctx.setTransform(D,0,0,D,0,0);ctx.textBaseline='middle';ctx.textAlign='center';
- const font=clamp(Math.min(W,H)*.0074,3.1,7.5);ctx.font=`${font}px ui-monospace, SFMono-Regular, Consolas, monospace`;
- cw=font*.64;ch=font*1.02;cols=Math.ceil(W/cw);rows=Math.ceil(H/ch);
+ W=canvas.clientWidth||innerWidth;H=canvas.clientHeight||innerHeight;portrait=H>W*1.2;smallScreen=W<430||H<820;D=Math.min(devicePixelRatio||1,portrait?1.5:2);canvas.width=Math.round(W*D);canvas.height=Math.round(H*D);
+ ctx.setTransform(D,0,0,D,0,0);ctx.textBaseline='middle';ctx.textAlign='center';ctx.imageSmoothingEnabled=false;
+ const font=portrait?clamp(Math.min(W,H)*(smallScreen?.0109:.0102),4.2,8.8):clamp(Math.min(W,H)*.0084,3.55,7.6);ctx.font=`600 ${font}px ui-monospace, SFMono-Regular, Consolas, monospace`;
+ cw=font*.66;ch=font*1.03;cols=Math.ceil(W/cw);rows=Math.ceil(H/ch);
  // Render into an oversampled grid before converting each cell to one glyph.
  source.width=cols*2;source.height=rows*2;
  // Preserve petal proportions while arranging the bouquet vertically on phones.
- portrait=H>W*1.2;
- fit=Math.min(W/800,H/810)*.99;left=(W-760*fit)/2;
- offsetY=portrait?H*.115:(H-730*fit)/2;
- yStretch=portrait?clamp((H*.64-offsetY)/(520*fit),1,2.35):1;
+ fit=portrait?W/805:Math.min(W/805,H/850);left=(W-760*fit)/2;
+ yStretch=portrait?clamp(H*.56/(515*fit),.9,2.1):.94;
+ offsetY=portrait?H*.255-106*yStretch*fit:Math.max(35,H*.50-360*fit);
  // The stems continue beyond the visible bottom edge at every viewport size.
- baseY=(H-offsetY)/fit+20;
+ baseY=(H-offsetY)/fit+18;
 }
-addEventListener('resize',resize);resize();
+addEventListener('resize',resize);if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
 function setup(){s.setTransform(1,0,0,1,0,0);s.clearRect(0,0,source.width,source.height);s.setTransform(fit*2/cw,0,0,fit*2/ch,left*2/cw,offsetY*2/ch);}
 function point(f,t){
  const d=t-f.touch, ripple=d>=0&&d<3?Math.sin(d*9)*Math.exp(-d*1.8)*12:0;
@@ -86,20 +89,20 @@ function point(f,t){
  const sway=wind+Math.sin(t*.62+f.seed*1.2)*(1.4+f.r*.017)+ripple;
  return {x:f.x+sway+camera.x*f.depth,y:layoutY(f.y)+Math.sin(t*.49+f.seed)*1.5+camera.y*f.depth+Math.abs(ripple)*.13};
 }
-function stem(f,t,growth){const p=point(f,t),base={x:380+(f.x-380)*(portrait?.29:.20)+Math.sin(f.seed*2.4)*15,y:baseY+(f.seed%3)*4};
+function stem(f,t,growth){const p=point(f,t),base={x:380+(f.x-380)*(portrait?.62:.42)+Math.sin(f.seed*2.4)*15,y:baseY+(f.seed%3)*4};
  const length=base.y-p.y;
  const c1={x:base.x+(f.x-380)*.10,y:base.y-length*.30},c2={x:p.x+(380-p.x)*.13,y:p.y+length*.23};
  const at=u=>{let k=1-u;return{x:k*k*k*base.x+3*k*k*u*c1.x+3*k*u*u*c2.x+u*u*u*p.x,y:k*k*k*base.y+3*k*k*u*c1.y+3*k*u*u*c2.y+u*u*u*p.y}};
  const grad=s.createLinearGradient(base.x,base.y,p.x,p.y);grad.addColorStop(0,'#426b50');grad.addColorStop(.55,'#61966b');grad.addColorStop(1,'#93bc83');
- s.strokeStyle=grad;s.lineCap='round';s.lineWidth=Math.max(portrait?4.4:2.6,f.r*.052);s.beginPath();s.moveTo(base.x,base.y);for(let i=1;i<=45;i++){let q=at(i/45*growth);s.lineTo(q.x,q.y)}s.stroke();
- for(let j=0;j<(portrait?4:2);j++){let u=portrait?.15+j*.19+(f.seed%4)*.027:.28+j*.28+(f.seed%3)*.035;if(growth<u)continue;let q=at(u),a=(f.x<380?-1:1)*(j===0?1:-1);if(f.seed%2===0)a=-a;
-  leaf(q.x,q.y,a*(.87+(j%2)*.14),f.r*(.76+(j%2)*.16)*(portrait?1.12:1),ease((growth-u)/.22),t,f.seed+j);
+ s.strokeStyle=grad;s.lineCap='round';s.lineWidth=Math.max(portrait?5.0:3.4,f.r*.054);s.beginPath();s.moveTo(base.x,base.y);const stemSteps=portrait?(smallScreen?28:32):45;for(let i=1;i<=stemSteps;i++){let q=at(i/stemSteps*growth);s.lineTo(q.x,q.y)}s.stroke();
+ for(let j=0;j<(portrait?3:2);j++){let u=portrait?.17+j*.22+(f.seed%4)*.025:.28+j*.28+(f.seed%3)*.035;if(growth<u)continue;let q=at(u),a=(f.x<380?-1:1)*(j===0?1:-1);if(f.seed%2===0)a=-a;
+  leaf(q.x,q.y,a*(.84+(j%2)*.12),f.r*(.58+(j%2)*.11)*(portrait?1.02:0.98),ease((growth-u)/.22),t,f.seed+j);
  }
 }
-function leaf(x,y,dir,len,g,t,seed){if(g<=0)return;s.save();s.translate(x,y);s.rotate(dir+Math.sin(t*.8+seed)*.04);s.scale(g,g);let w=len*.23;
+function leaf(x,y,dir,len,g,t,seed){if(g<=0)return;s.save();s.translate(x,y);s.rotate(dir+Math.sin(t*.8+seed)*.04);s.scale(g,g);let w=len*.22;
  const gr=s.createLinearGradient(-w,0,w,-len*.3);gr.addColorStop(0,'#183b31');gr.addColorStop(.43,'#4f9468');gr.addColorStop(.52,'#b0c887');gr.addColorStop(.61,'#548958');gr.addColorStop(1,'#1d493c');s.fillStyle=gr;
  s.beginPath();s.moveTo(0,0);s.bezierCurveTo(-w*1.8,-len*.3,-w*.85,-len*.78,0,-len);s.bezierCurveTo(w*1.23,-len*.75,w*1.55,-len*.28,0,0);s.fill();
- s.strokeStyle='#83ad79';s.lineWidth=1.5;s.beginPath();s.moveTo(0,-2);s.quadraticCurveTo(2,-len*.55,0,-len*.96);s.stroke();s.restore();}
+ s.strokeStyle='#83ad79';s.lineWidth=smallScreen?1.1:1.35;s.beginPath();s.moveTo(0,-2);s.quadraticCurveTo(2,-len*.55,0,-len*.96);s.stroke();s.restore();}
 // True spatial petal geometry. The axis is independent of the camera.
 const unfold=x=>{x=clamp(x);return x*x*(3-2*x)};
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -111,7 +114,7 @@ function head(f,t,age,local=false){
  if(age<=0)return;
  const p=local?{x:0,y:0}:point(f,t),R=f.r,pal=f.p,daisy=f.kind==='daisy';
  // Fully opened heads are cached; living stems and subtle whole-head sway stay animated.
- if(!local&&age>=2.95){
+ if(!local&&age>=2.4){
   if(!f.cache){const img=document.createElement('canvas'),pad=Math.ceil(R*1.32);img.width=img.height=pad*4;const prev=s;s=img.getContext('2d');s.setTransform(2,0,0,2,pad*2,pad*2);head(f,0,3.6,true);s=prev;f.cache={img,pad};}
   const {img,pad}=f.cache;s.save();s.translate(p.x,p.y);s.rotate(Math.sin(t*.83-f.x*.008)*.035+Math.sin(t*.66+f.seed)*.015);s.globalAlpha=.97+.03*Math.sin(t*.68+f.seed);s.drawImage(img,-pad,-pad,pad*2,pad*2);s.restore();return;
  }
@@ -124,14 +127,14 @@ function head(f,t,age,local=false){
  const faces=[];
  function face(qs,base,edge=0){
   const normal=unit(cross(sub(qs[1],qs[0]),sub(qs[qs.length-1],qs[0])));
-  const L=.24+.76*Math.abs(dot(normal,light));
+  const L=.39+.61*Math.abs(dot(normal,light));
   const depth=qs.reduce((a,q)=>a+q[2],0)/qs.length;
   let c=lerpColor(pal.dark,pal.mid,clamp(.35+base*.43+L*.32));
   c=lerpColor(c,pal.light,clamp((base*.52+edge*.21)*L));
   faces.push({qs,c,depth});
  }
- const rings=daisy?[{count:12,r:.99,h:.23,w:.19},{count:10,r:.75,h:.33,w:.17}]:[
- {count:9,r:.99,h:.32,w:.40},{count:8,r:.79,h:.46,w:.37},{count:7,r:.59,h:.57,w:.32},{count:6,r:.40,h:.68,w:.27},{count:5,r:.23,h:.75,w:.20}];
+ const rings=daisy?[{count:12,r:.99,h:.28,w:.23},{count:10,r:.75,h:.40,w:.20}]:[
+ {count:9,r:.99,h:.39,w:.44},{count:8,r:.79,h:.51,w:.39},{count:7,r:.59,h:.57,w:.32},{count:6,r:.40,h:.68,w:.27},{count:5,r:.23,h:.75,w:.20}];
  rings.forEach((ring,k)=>{
   for(let i=0;i<ring.count;i++){
    const a=TAU*i/ring.count+k*.53+f.seed*.73;
@@ -175,7 +178,7 @@ function head(f,t,age,local=false){
  }
 }
 const drift=Array.from({length:62},(_,i)=>({seed:i,delay:1.9+(i%15)*.24,x:20+((i*157)%720),y:40+((i*91)%420),speed:13+(i%5)*4,p:[pink,peach,lilac,cream,coral][i%5]}));
-function falling(t){for(const f of drift){let age=t-f.delay;if(age<0)continue;let u=age%19,fade=ease(u/.9)*ease((19-u)/3);if(fade<.01)continue;let x=f.x+Math.sin(u*.63+f.seed)*30+u*(f.seed%2?1:-1)*4,y=layoutY(f.y)+u*f.speed;if(y>baseY)continue;s.save();s.translate(x,y);s.rotate(u*.7+f.seed);s.globalAlpha=fade*.72;s.scale(.55+.45*Math.abs(Math.cos(u*1.1+f.seed)),1);let gr=s.createLinearGradient(-5,-5,6,7);gr.addColorStop(0,rgb(f.p.light));gr.addColorStop(1,rgb(f.p.mid));s.fillStyle=gr;s.beginPath();s.moveTo(0,8);s.bezierCurveTo(-11,-2,-5,-10,0,-6);s.bezierCurveTo(8,-11,10,0,0,8);s.fill();s.restore();}}
+function falling(t){const limit=portrait?(smallScreen?34:44):62;for(let ii=0;ii<limit;ii++){const f=drift[ii];let age=t-f.delay;if(age<0)continue;let u=age%19,fade=ease(u/.9)*ease((19-u)/3);if(fade<.01)continue;let x=f.x+Math.sin(u*.63+f.seed)*30+u*(f.seed%2?1:-1)*4,y=layoutY(f.y)+u*f.speed;if(y>baseY)continue;s.save();s.translate(x,y);s.rotate(u*.7+f.seed);s.globalAlpha=fade*.72;s.scale(.55+.45*Math.abs(Math.cos(u*1.1+f.seed)),1);let gr=s.createLinearGradient(-5,-5,6,7);gr.addColorStop(0,rgb(f.p.light));gr.addColorStop(1,rgb(f.p.mid));s.fillStyle=gr;s.beginPath();s.moveTo(0,8);s.bezierCurveTo(-11,-2,-5,-10,0,-6);s.bezierCurveTo(8,-11,10,0,0,8);s.fill();s.restore();}}
 // Butterflies are drawn in the same sampled ASCII field as the bouquet.
 // A small ecosystem: butterflies alternate between wandering, approaching and resting.
 const butterflies=[{x:122,y:146,rx:90,ry:65,size:32,p:peach,phase:0},{x:641,y:148,rx:87,ry:71,size:33,p:lilac,phase:2.2},{x:108,y:453,rx:79,ry:107,size:29,p:pink,phase:4.1},{x:655,y:416,rx:80,ry:109,size:31,p:blue,phase:5.3}];
@@ -183,7 +186,8 @@ if(Math.random()<.16)butterflies.push({x:380,y:58,rx:150,ry:52,size:35,p:gold,ph
 function orbit(b,t){let k=t*.52+b.phase;return {x:b.x+b.rx*Math.sin(k)+15*Math.sin(k*2.2)+camera.x*.7,y:layoutY(b.y)+b.ry*Math.cos(k*.79)+9*Math.sin(k*3.3)+camera.y*.7};}
 function perch(f,t){const p=point(f,t);return{x:p.x+f.nx*f.r*.36,y:p.y-f.r*.48};}
 function butterfliesAt(t){
- butterflies.forEach((b,i)=>{let a=t-2.0-i*.32;if(a<0)return;
+ const active=portrait?(smallScreen?3:4):butterflies.length;
+ butterflies.slice(0,active).forEach((b,i)=>{let a=t-2.0-i*.32;if(a<0)return;
  if(!b.state){b.state='fly';b.until=t+2.4+Math.random()*3; b.angle=0;}
  if(b.state==='fly'&&t>b.until){const choices=flowers.filter(f=>t>f.delay+2.6&&!butterflies.some(other=>other!==b&&other.target===f));
  if(choices.length){const here=orbit(b,a);choices.sort((f,g)=>Math.hypot(f.x-here.x,layoutY(f.y)-here.y)-Math.hypot(g.x-here.x,layoutY(g.y)-here.y));b.target=choices[Math.floor(Math.random()*Math.min(5,choices.length))];b.state='approach';b.since=t;b.from=here;b.until=t+1.5+Math.random()*.65;}}
@@ -208,24 +212,25 @@ const pollen=Array.from({length:88},(_,i)=>({f:flowers[i%flowers.length],phase:M
 let bursts=[];
 function mote(x,y,alpha,r,bright){if(alpha<=.025)return;s.save();s.globalAlpha=alpha;s.fillStyle=bright?'#fff1be':'#efbe70';s.beginPath();s.arc(x,y,r,0,TAU);s.fill();if(bright){s.fillRect(x-r*1.7,y-.6,r*3.4,1.2);s.fillRect(x-.6,y-r*1.7,1.2,r*3.4);}s.restore();}
 function pollenAt(t){
- for(const m of pollen){let start=m.f.delay+.9+m.delay;if(t<start)continue;let u=((t-start)%m.life)/m.life,p=point(m.f,t),ang=m.phase+u*1.5;let a=ease(u/.16)*ease((1-u)/.3)*(.35+.65*Math.pow(.5+.5*Math.sin(t*3+m.seed),2));
+ const limit=portrait?(smallScreen?42:54):88;
+ for(let ii=0;ii<limit;ii++){const m=pollen[ii];let start=m.f.delay+.9+m.delay;if(t<start)continue;let u=((t-start)%m.life)/m.life,p=point(m.f,t),ang=m.phase+u*1.5;let a=ease(u/.16)*ease((1-u)/.3)*(.35+.65*Math.pow(.5+.5*Math.sin(t*3+m.seed),2));
  mote(p.x+Math.cos(ang)*(12+u*53)+Math.sin(t*.8+m.seed)*8,p.y-m.f.r*.38-u*(42+10*Math.sin(m.seed))+Math.sin(ang)*15,a*.83,1.6+1.0*Math.sin(m.seed)**2,Math.sin(t*3+m.seed)>.72);}
  bursts=bursts.filter(b=>t-b.start<2.1);for(const b of bursts){let d=t-b.start,u=d/2.1;if(d<0)continue;let k=1-Math.exp(-d*2.4);mote(b.x+Math.cos(b.a)*b.r*k,b.y+Math.sin(b.a)*b.r*k-23*d,ease(1-u)*.95,b.size,true);}
 }
-function draw(now){requestAnimationFrame(draw);if(document.hidden)return;if(reduced&&last&&now-last<1000)return;if(now-last<(worldTime>5.8?21:28))return;last=now;let t=reduced?12:(now-started)/1000;worldTime=t;
+function draw(now){requestAnimationFrame(draw);if(document.hidden)return;if(reduced&&last&&now-last<1000)return;const budget=worldTime>5.8?(portrait?(smallScreen?34:30):21):(portrait?(smallScreen?40:36):28);if(now-last<budget)return;last=now;let t=reduced?12:(now-started)/1000;worldTime=t;
  let dt=lastTime?Math.min(.1,(now-lastTime)/1000):.033;lastTime=now;
  camera.x+=(camera.tx-camera.x)*(1-Math.exp(-dt*3.8));camera.y+=(camera.ty-camera.y)*(1-Math.exp(-dt*3.8));
  setup();
  sprigs.forEach(f=>sprig(f,t,ease((t-.04-f.seed*.013)/1.65)));
  flowers.forEach(f=>stem(f,t,ease((t-f.stemDelay)/.85)));
- flowers.forEach(f=>{let age=t-f.delay;head(f,t,age);});
+ for(const f of flowerLayers){let age=t-f.delay;head(f,t,age);}
  if(!reduced){falling(t);pollenAt(t);butterfliesAt(t);} 
  const data=s.getImageData(0,0,source.width,source.height).data;ctx.clearRect(0,0,W,H);
  // The only visible marks are ASCII glyphs. No raster image is displayed.
  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
   let rr=0,gg=0,bb=0,aa=0;for(let j=0;j<2;j++)for(let i=0;i<2;i++){let n=((y*2+j)*source.width+x*2+i)*4,a=data[n+3]/255;rr+=data[n]*a;gg+=data[n+1]*a;bb+=data[n+2]*a;aa+=a;}
-  if(aa<.54)continue;rr/=aa;gg/=aa;bb/=aa;let lum=(rr*.27+gg*.53+bb*.20)/255;let density=clamp((.24+lum*.98)*Math.pow(aa/4,.57));let idx=Math.min(ramp.length-1,Math.floor(density*ramp.length));
-  ctx.fillStyle=`rgba(${Math.min(255,Math.round(rr*1.20+21))},${Math.min(255,Math.round(gg*1.16+15))},${Math.min(255,Math.round(bb*1.15+16))},${Math.min(1,aa/3)})`;ctx.fillText(ramp[idx],(x+.5)*cw,Math.min(H-1,(y+.5)*ch));
+  if(aa<.54)continue;rr/=aa;gg/=aa;bb/=aa;let lum=(rr*.27+gg*.53+bb*.20)/255;let density=clamp((.33+lum*1.02)*Math.pow(aa/4,.60));let idx=Math.min(ramp.length-1,Math.floor(density*ramp.length));
+  ctx.fillStyle=`rgba(${Math.min(255,Math.round(rr*1.18+26))},${Math.min(255,Math.round(gg*1.16+21))},${Math.min(255,Math.round(bb*1.18+22))},${Math.min(1,aa/2.7)})`;ctx.fillText(ramp[idx],(x+.5)*cw,Math.min(H-1,(y+.5)*ch));
  }
 }
 // The garden is discoverable without instructions or visible controls.
@@ -236,7 +241,7 @@ canvas.addEventListener('pointerup',e=>{if(e.pointerType!=='mouse')camera.tx=cam
 canvas.addEventListener('pointercancel',()=>{camera.tx=camera.ty=0;});
 canvas.addEventListener('pointerdown',e=>{if(reduced)return;steer(e);const t=worldTime,x=(e.clientX-left)/fit,y=(e.clientY-offsetY)/fit;
  let hit=null,score=1.15;for(const f of flowers){if(t<f.delay+.25)continue;let p=point(f,t),d=Math.hypot(x-p.x,(y-p.y+f.r*.28)*1.15)/f.r;if(d<score){hit=f;score=d;}}
- if(!hit)return;hit.touch=t;let pos=point(hit,t);for(let i=0;i<30;i++)bursts.push({start:t,x:pos.x+hit.nx*hit.r*.25,y:pos.y-hit.r*.35,a:Math.random()*TAU,r:22+Math.random()*66,size:1.5+Math.random()*1.7});if(bursts.length>180)bursts=bursts.slice(-180);
+ if(!hit)return;hit.touch=t;let pos=point(hit,t);const burstCount=portrait?(smallScreen?18:22):30;for(let i=0;i<burstCount;i++)bursts.push({start:t,x:pos.x+hit.nx*hit.r*.25,y:pos.y-hit.r*.35,a:Math.random()*TAU,r:22+Math.random()*66,size:1.5+Math.random()*1.7});if(bursts.length>150)bursts=bursts.slice(-150);
  for(const b of butterflies){if(b.state==='rest'&&b.target&&Math.hypot(b.target.x-hit.x,b.target.y-hit.y)<125)b.target.touch=t;}
 });
 
