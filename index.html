@@ -22,35 +22,40 @@
 <body>
 <canvas id="bloom" aria-label="Buket bunga ASCII yang mekar ke berbagai arah"></canvas>
 <div id="pull-refresh" aria-hidden="true"><svg viewBox="0 0 32 32"><circle class="track" cx="16" cy="16" r="12"/><circle class="ring" cx="16" cy="16" r="12"/><path class="arrow" d="M12 16a4 4 0 1 1 4 4m0-3v3h3"/></svg></div>
-<audio id="bgm" src="./backsound.mp3" loop preload="auto" playsinline></audio>
+<audio id="bgm" src="./backsound.mp3" autoplay loop preload="auto" playsinline></audio>
 <script>
 'use strict';
 const canvas=document.getElementById('bloom'),ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
-// Audio follows page lifecycle; resume only if it was playing before leaving.
+// Request audible autoplay whenever allowed by the browser. Keep a gesture fallback.
 const bgm=document.getElementById('bgm');
-bgm.volume=.60;bgm.loop=true;bgm.muted=false;
+bgm.volume=.60;bgm.loop=true;bgm.muted=false;bgm.autoplay=true;
 let audioWanted=false, audioPending=null, audioSuspended=false, pageAway=false;
 function canPlayAudio(){return !document.hidden&&!audioSuspended&&!pageAway;}
-function ensureAudio(){
- if(!canPlayAudio()||audioPending||(!bgm.paused&&!bgm.ended))return;
+function ensureAudio(event){
+ if(!canPlayAudio()||(!bgm.paused&&!bgm.ended))return;
+ if(audioPending&&!(event?.isTrusted&&navigator.userActivation?.isActive))return;
  try{
   const pending=bgm.play();
   if(pending&&pending.then){audioPending=pending;pending.then(()=>{audioWanted=true;if(!canPlayAudio())bgm.pause();}).catch(e=>{if(e.name!=='NotAllowedError'&&e.name!=='AbortError')console.warn('Backsound playback:',e.name,e.message);}).finally(()=>{if(audioPending===pending)audioPending=null;});}
   else{audioWanted=true;if(!canPlayAudio())bgm.pause();}
  }catch(e){console.warn('Backsound playback:',e);}
 }
-function suspendAudio(){audioSuspended=true;if(!bgm.paused)audioWanted=true;bgm.pause();}
-function resumeAudio(){if(document.hidden||pageAway)return;audioSuspended=false;if(audioWanted){if(audioPending)audioPending.finally(()=>{if(canPlayAudio()&&audioWanted)ensureAudio();}).catch(()=>{});else ensureAudio();}}
+function suspendAudio(){audioSuspended=true;bgm.autoplay=false;if(!bgm.paused)audioWanted=true;bgm.pause();}
+function resumeAudio(){if(document.hidden||pageAway)return;audioSuspended=false;bgm.autoplay=true;if(audioPending)audioPending.finally(()=>{if(canPlayAudio())ensureAudio();}).catch(()=>{});else ensureAudio();}
 bgm.addEventListener('play',()=>{if(!canPlayAudio())bgm.pause();else audioWanted=true;});
+bgm.addEventListener('playing',()=>{if(!canPlayAudio())bgm.pause();else audioWanted=true;});
+bgm.addEventListener('canplay',ensureAudio,{once:true});
+bgm.addEventListener('canplaythrough',ensureAudio,{once:true});
 bgm.addEventListener('error',()=>console.warn('Backsound could not load:',bgm.currentSrc,bgm.error?.code,bgm.error?.message));
 for(const event of ['pointerdown','pointerup','touchend','click','keydown'])document.addEventListener(event,ensureAudio,{capture:true,passive:true});
+window.addEventListener('load',ensureAudio,{once:true});
 window.addEventListener('blur',suspendAudio);
 window.addEventListener('focus',resumeAudio);
 window.addEventListener('pagehide',()=>{pageAway=true;suspendAudio();});
 window.addEventListener('pageshow',()=>{pageAway=false;resumeAudio();});
 document.addEventListener('freeze',suspendAudio);
 document.addEventListener('resume',resumeAudio);
-ensureAudio();
+if(document.hidden)suspendAudio();else ensureAudio();
 const source=document.createElement('canvas'); let s=source.getContext('2d',{willReadFrequently:true});
 const TAU=Math.PI*2, clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), mix=(a,b,t)=>a+(b-a)*t;
 const ease=x=>{x=clamp(x);return x*x*(3-2*x)};
