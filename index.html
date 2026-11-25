@@ -2,19 +2,55 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<meta name="bloom-version" content="5.11">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Just for You</title><meta name="theme-color" content="#08070d">
 <style>
 *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#08070d}body{background:radial-gradient(ellipse at 50% 40%,#241021 0%,#100b17 48%,#08070d 82%)}canvas{display:block;position:fixed;inset:0;width:100%;height:100%;height:100dvh;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent} 
+
+#pull-refresh{position:fixed;z-index:20;top:0;left:50%;width:40px;height:40px;display:grid;place-items:center;pointer-events:none;opacity:0;transform:translate(-50%,-48px);will-change:transform,opacity;color:#f6d9e6;}
+#pull-refresh svg{width:32px;height:32px;overflow:visible;filter:drop-shadow(0 0 5px #e8a6c24d)}
+#pull-refresh .track{fill:none;stroke:currentColor;stroke-opacity:.17;stroke-width:2}
+#pull-refresh .ring{fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:0 75.4;transform:rotate(-90deg);transform-origin:16px 16px}
+#pull-refresh .arrow{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+#pull-refresh.spinning svg{animation:pull-spin .58s linear infinite}
+#pull-refresh.spinning .ring{stroke-dasharray:47 75.4!important}
+@keyframes pull-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#pull-refresh.spinning svg{animation:none}}
 </style>
 </head>
 <body>
 <canvas id="bloom" aria-label="Buket bunga ASCII yang mekar ke berbagai arah"></canvas>
-<audio id="bgm" src="backsound.mp3" loop preload="auto"></audio>
+<div id="pull-refresh" aria-hidden="true"><svg viewBox="0 0 32 32"><circle class="track" cx="16" cy="16" r="12"/><circle class="ring" cx="16" cy="16" r="12"/><path class="arrow" d="M12 16a4 4 0 1 1 4 4m0-3v3h3"/></svg></div>
+<audio id="bgm" src="./backsound.mp3" loop preload="auto" playsinline></audio>
 <script>
 'use strict';
 const canvas=document.getElementById('bloom'),ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
-const bgm=document.getElementById('bgm'); if(bgm){bgm.volume=.38;} let audioUnlocked=false; function ensureAudio(){ if(!bgm||audioUnlocked) return; const p=bgm.play(); if(p&&p.then){p.then(()=>{audioUnlocked=true;}).catch(()=>{});} else audioUnlocked=true; }
+// Audio follows page lifecycle; resume only if it was playing before leaving.
+const bgm=document.getElementById('bgm');
+bgm.volume=.60;bgm.loop=true;bgm.muted=false;
+let audioWanted=false, audioPending=null, audioSuspended=false, pageAway=false;
+function canPlayAudio(){return !document.hidden&&!audioSuspended&&!pageAway;}
+function ensureAudio(){
+ if(!canPlayAudio()||audioPending||(!bgm.paused&&!bgm.ended))return;
+ try{
+  const pending=bgm.play();
+  if(pending&&pending.then){audioPending=pending;pending.then(()=>{audioWanted=true;if(!canPlayAudio())bgm.pause();}).catch(e=>{if(e.name!=='NotAllowedError'&&e.name!=='AbortError')console.warn('Backsound playback:',e.name,e.message);}).finally(()=>{if(audioPending===pending)audioPending=null;});}
+  else{audioWanted=true;if(!canPlayAudio())bgm.pause();}
+ }catch(e){console.warn('Backsound playback:',e);}
+}
+function suspendAudio(){audioSuspended=true;if(!bgm.paused)audioWanted=true;bgm.pause();}
+function resumeAudio(){if(document.hidden||pageAway)return;audioSuspended=false;if(audioWanted){if(audioPending)audioPending.finally(()=>{if(canPlayAudio()&&audioWanted)ensureAudio();}).catch(()=>{});else ensureAudio();}}
+bgm.addEventListener('play',()=>{if(!canPlayAudio())bgm.pause();else audioWanted=true;});
+bgm.addEventListener('error',()=>console.warn('Backsound could not load:',bgm.currentSrc,bgm.error?.code,bgm.error?.message));
+for(const event of ['pointerdown','pointerup','touchend','click','keydown'])document.addEventListener(event,ensureAudio,{capture:true,passive:true});
+window.addEventListener('blur',suspendAudio);
+window.addEventListener('focus',resumeAudio);
+window.addEventListener('pagehide',()=>{pageAway=true;suspendAudio();});
+window.addEventListener('pageshow',()=>{pageAway=false;resumeAudio();});
+document.addEventListener('freeze',suspendAudio);
+document.addEventListener('resume',resumeAudio);
+ensureAudio();
 const source=document.createElement('canvas'); let s=source.getContext('2d',{willReadFrequently:true});
 const TAU=Math.PI*2, clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), mix=(a,b,t)=>a+(b-a)*t;
 const ease=x=>{x=clamp(x);return x*x*(3-2*x)};
@@ -73,7 +109,7 @@ function sprig(f,t,g){if(g<=0)return;const x=f.x+Math.sin(t*.82-f.x*.008)*5+came
 let W,H,D,cols,rows,cw,ch,fit,left,offsetY,baseY,yStretch=1,portrait=false,smallScreen=false,started=performance.now(),last=0;
 const layoutY=y=>y*yStretch;
 const camera={x:0,y:0,tx:0,ty:0};
-const gesture={active:false,x:0,y:0};let lastTime=0,worldTime=0;
+let lastTime=0,worldTime=0;
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // GPU glyph compositor: no full-canvas pixel readback or thousands of fillText calls.
 function makeRenderer(){
@@ -232,18 +268,39 @@ canvas.addEventListener('pointerdown',e=>{ensureAudio();if(reduced)return;steer(
  for(const b of butterflies){if(b.state==='rest'&&b.target&&Math.hypot(b.target.x-hit.x,b.target.y-hit.y)<125)b.target.touch=t;}
 });
 
-// Replay on an upward scroll or a deliberate vertical swipe; taps still interact.
-let lastReplay=-Infinity;
-function replayGesture(){const now=performance.now();if(now-lastReplay<900)return;lastReplay=now;restartShow();}
-canvas.addEventListener('wheel',e=>{if(e.deltaY<-24)replayGesture();},{passive:true});
-canvas.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;gesture.active=true;gesture.x=e.touches[0].clientX;gesture.y=e.touches[0].clientY;},{passive:true});
-canvas.addEventListener('touchcancel',()=>{gesture.active=false;},{passive:true});
-canvas.addEventListener('touchend',e=>{ensureAudio();if(!gesture.active)return;gesture.active=false;const p=e.changedTouches[0];if(p&&Math.abs(p.clientY-gesture.y)>75&&Math.abs(p.clientY-gesture.y)>Math.abs(p.clientX-gesture.x)*1.3)replayGesture();},{passive:true});
-addEventListener('keydown',e=>{if(e.key==='ArrowUp'||e.key==='r'||e.key==='R'){ensureAudio();replayGesture();}});
+// Pull-to-replay: indicator is visible only during the gesture and its completion.
+const pull=document.getElementById('pull-refresh'), ring=pull.querySelector('.ring');
+const PULL_DISTANCE=72;let lastReplay=-Infinity,refreshBusy=false,hideTimer=0,wheelTimer=0,wheelTotal=0,wheelLast=0,wheelFired=false;
+function showPull(distance){if(refreshBusy||!ready)return;clearTimeout(hideTimer);pull.style.transition='none';const p=Math.min(1,distance/PULL_DISTANCE);pull.style.opacity=String(Math.min(1,distance/22));pull.style.transform=`translate(-50%,${-40+Math.min(80,distance*.95)}px) rotate(${p*160}deg)`;ring.style.strokeDasharray=`${75.4*p} 75.4`;}
+function hidePull(){if(refreshBusy)return;pull.style.transition='transform .22s ease, opacity .2s ease';pull.style.opacity='0';pull.style.transform='translate(-50%,-48px)';}
+function replayGesture(){const now=performance.now();if(!ready||refreshBusy||now-lastReplay<800){hidePull();return;}lastReplay=now;refreshBusy=true;clearTimeout(hideTimer);pull.style.transition='transform .18s ease,opacity .15s ease';pull.style.transform='translate(-50%,24px)';pull.style.opacity='1';pull.classList.add('spinning');restartShow();hideTimer=setTimeout(()=>{refreshBusy=false;pull.classList.remove('spinning');hidePull();},620);}
+window.addEventListener('wheel',e=>{
+ if(e.ctrlKey)return;if(e.cancelable)e.preventDefault();if(!ready)return;
+ const now=performance.now();if(now-wheelLast>280){wheelTotal=0;wheelFired=false;}wheelLast=now;
+ const dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?H:1);
+ if(dy<0&&!wheelFired&&!refreshBusy){wheelTotal+=-dy;showPull(Math.min(80,wheelTotal*2));if(wheelTotal>=36){wheelFired=true;replayGesture();}}
+ else if(dy>0&&!refreshBusy){wheelTotal=0;hidePull();}
+ clearTimeout(wheelTimer);wheelTimer=setTimeout(()=>{wheelTotal=0;wheelFired=false;hidePull();},300);
+},{capture:true,passive:false});
+let swipe=null;
+function beginSwipe(id,x,y){if(refreshBusy||!ready)return;swipe={id,x,y,distance:0};}
+function moveSwipe(id,x,y){if(!swipe||swipe.id!==id)return;const dx=x-swipe.x,dy=y-swipe.y;swipe.distance=Math.abs(dy)>Math.abs(dx)*1.15?Math.abs(dy):0;showPull(swipe.distance);}
+function endSwipe(id,x,y){if(!swipe||swipe.id!==id)return;moveSwipe(id,x,y);const distance=swipe.distance;swipe=null;if(distance>=PULL_DISTANCE)replayGesture();else hidePull();}
+function cancelSwipe(){swipe=null;hidePull();}
+// Native touch stream plus pen input, without double-firing pointer and touch events.
+window.addEventListener('touchstart',e=>{if(e.touches.length!==1){cancelSwipe();return;}const p=e.changedTouches[0];beginSwipe(p.identifier,p.clientX,p.clientY);},{capture:true,passive:true});
+window.addEventListener('touchmove',e=>{if(e.touches.length!==1){cancelSwipe();return;}const p=e.touches[0];if(e.cancelable)e.preventDefault();moveSwipe(p.identifier,p.clientX,p.clientY);},{capture:true,passive:false});
+window.addEventListener('touchend',e=>{for(const p of e.changedTouches)endSwipe(p.identifier,p.clientX,p.clientY);},{capture:true,passive:true});
+window.addEventListener('touchcancel',cancelSwipe,{capture:true,passive:true});
+window.addEventListener('pointerdown',e=>{if(e.pointerType==='pen'){beginSwipe('pen',e.clientX,e.clientY);try{e.target.setPointerCapture(e.pointerId);}catch(_){}}},{capture:true,passive:true});
+window.addEventListener('pointermove',e=>{if(e.pointerType==='pen')moveSwipe('pen',e.clientX,e.clientY);},{capture:true,passive:true});
+window.addEventListener('pointerup',e=>{if(e.pointerType==='pen')endSwipe('pen',e.clientX,e.clientY);},{capture:true,passive:true});
+window.addEventListener('pointercancel',e=>{if(e.pointerType==='pen')cancelSwipe();},{capture:true,passive:true});
+window.addEventListener('keydown',e=>{if(!e.repeat&&(e.key==='ArrowUp'||e.key.toLowerCase()==='r')){e.preventDefault();replayGesture();}});
 let hiddenAt=null;
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden){hiddenAt=performance.now();}
- else if(hiddenAt!==null){started+=performance.now()-hiddenAt;hiddenAt=null;lastTime=0;}
+ if(document.hidden){hiddenAt=performance.now();suspendAudio();cancelSwipe();}
+ else{if(hiddenAt!==null){started+=performance.now()-hiddenAt;hiddenAt=null;lastTime=0;}resumeAudio();}
 });
 Promise.all(baked.map((_,i)=>loadAtlas(i))).then(()=>{for(let i=0;i<baked.length;i++){budFrame(i);finalFrame(i);}ready=true;started=performance.now();requestAnimationFrame(draw);}).catch(e=>{console.error("Bloom asset failed",e);});
 </script>
